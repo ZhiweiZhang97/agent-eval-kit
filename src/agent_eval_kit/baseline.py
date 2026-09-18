@@ -267,7 +267,11 @@ def comparison_markdown(comparison: BaselineComparison) -> str:
         judge = "-" if diff.judge_delta is None else f"{diff.judge_delta:+.3f}"
         before_tools = " → ".join(diff.before_tools) or "-"
         after_tools = " → ".join(diff.after_tools) or "-"
-        tool_change = (\n            before_tools\n            if before_tools == after_tools\n            else f"{before_tools} → {after_tools}"\n        )
+        tool_change = (
+            before_tools
+            if before_tools == after_tools
+            else f"{before_tools} → {after_tools}"
+        )
         lines.append(
             f"| {diff.id} | {'PASS' if diff.before_passed else 'FAIL'} | "
             f"{'PASS' if diff.after_passed else 'FAIL'} | {latency} | "
