@@ -1,27 +1,30 @@
 # Roadmap
 
-Agent Eval Kit is intentionally small. The roadmap focuses on capabilities that make regression evaluation more useful in real agent and RAG delivery workflows without turning the core into a hosted platform.
+Agent Eval Kit aims to remain a small, inspectable regression framework rather than a hosted evaluation platform.
 
-## v0.3 — Baselines and extensibility
+## v0.5 — Reproducibility and comparison
 
-- Compare a run against a versioned baseline report.
-- Fail CI on configurable pass-rate, latency, or judge-score regressions.
-- Add a small custom-evaluator plugin interface.
-- Improve report diffs for pull requests.
-
-## v0.4 — Agent and RAG depth
-
-- Tool-call and agent-trajectory assertions.
-- Stronger citation attribution and RAG faithfulness checks.
-- Optional semantic similarity evaluators.
-- Dataset adapters for common JSONL/CSV evaluation sets.
-
-## v0.5 — Reproducibility and scale
-
-- Repeated runs and variance summaries.
-- Rate-limit aware scheduling.
+- Repeated runs and variance summaries for stochastic models.
 - Model/provider comparison matrices.
-- Better HTML trend and comparison views.
+- Per-case latency and judge-score regression diffs.
+- Better PR-friendly Markdown summaries.
+- Rate-limit aware scheduling.
+
+## v0.6 — RAG and agent depth
+
+- Claim-level citation attribution.
+- Optional semantic similarity evaluators.
+- Richer agent trajectory objects for multi-turn tool execution.
+- Dataset adapters for JSONL and CSV.
+- Optional trace import from common agent frameworks.
+
+## Toward 1.0
+
+- Stabilize the YAML evaluation contract.
+- Stabilize the JSON report schema.
+- Define plugin API compatibility guarantees.
+- Publish migration guides for breaking changes.
+- Add a documented security and privacy threat model.
 
 ## Non-goals
 

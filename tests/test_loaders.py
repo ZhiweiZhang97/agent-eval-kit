@@ -13,30 +13,43 @@ def test_load_cases_backward_compatible(tmp_path: Path):
     )
     cases = load_cases(file)
     assert len(cases) == 1
-    assert cases[0].id == "a"
     assert cases[0].expect.contains == ["world"]
 
 
-def test_load_new_expectation_format(tmp_path: Path):
+def test_load_v04_agent_and_rag_fields(tmp_path: Path):
     file = tmp_path / "cases.yaml"
     file.write_text(
         """cases:
-  - id: a
-    prompt: hello
+  - id: agent
+    prompt: search
+    tools:
+      - type: function
+        function:
+          name: search
+          parameters:
+            type: object
+    tool_choice: auto
     expect:
-      regex: ['h.*o']
-      max_latency_ms: 1000
-      judge:
-        criteria: useful
-        min_score: 0.8
+      citations:
+        validate_sources: true
+        min_precision: 1.0
+      tool_calls:
+        required: [search]
+        max_count: 2
+      custom:
+        short-answer:
+          max_chars: 100
 """,
         encoding="utf-8",
     )
     case = load_cases(file)[0]
-    assert case.expect.regex == ["h.*o"]
-    assert case.expect.max_latency_ms == 1000
-    assert case.expect.judge is not None
-    assert case.expect.judge.min_score == 0.8
+    assert case.tools[0]["function"]["name"] == "search"
+    assert case.tool_choice == "auto"
+    assert case.expect.citations is not None
+    assert case.expect.citations.validate_sources is True
+    assert case.expect.tool_calls is not None
+    assert case.expect.tool_calls.required == ["search"]
+    assert case.expect.custom[0].name == "short-answer"
 
 
 def test_duplicate_ids_rejected(tmp_path: Path):

@@ -4,13 +4,21 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-eval-kit"
-version = "0.2.0"
-description = "A lightweight, provider-agnostic regression evaluation toolkit for LLM agents and RAG applications."
+version = "0.4.0"
+description = "Regression evaluation toolkit for LLM agents, tool calls, and RAG applications."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 authors = [{name = "Zhiwei Zhang"}]
-keywords = ["llm", "agent", "rag", "evaluation", "regression-testing", "ai-testing"]
+keywords = [
+  "llm",
+  "agent",
+  "tool-calling",
+  "rag",
+  "evaluation",
+  "regression-testing",
+  "ai-testing",
+]
 classifiers = [
   "Development Status :: 3 - Alpha",
   "Programming Language :: Python :: 3",

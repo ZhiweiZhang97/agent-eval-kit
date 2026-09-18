@@ -1,10 +1,11 @@
+import json
 from pathlib import Path
 
-from agent_eval_kit.models import CheckResult, EvalResult
+from agent_eval_kit.models import CheckResult, EvalResult, ToolCall
 from agent_eval_kit.reporting import write_html, write_json, write_junit, write_markdown
 
 
-def test_all_report_formats(tmp_path: Path):
+def test_all_report_formats_include_tool_calls(tmp_path: Path):
     results = [
         EvalResult(
             id="a",
@@ -12,6 +13,7 @@ def test_all_report_formats(tmp_path: Path):
             response="ok",
             latency_ms=10.0,
             checks={"contains:ok": CheckResult(True, "found")},
+            tool_calls=[ToolCall("search", {"query": "x"})],
         )
     ]
     paths = {
@@ -24,6 +26,12 @@ def test_all_report_formats(tmp_path: Path):
     write_markdown(paths["md"], results)
     write_html(paths["html"], results)
     write_junit(paths["junit"], results)
+
     for path in paths.values():
         assert path.exists()
         assert path.stat().st_size > 0
+
+    payload = json.loads(paths["json"].read_text(encoding="utf-8"))
+    assert payload["toolkit_version"] == "0.4.0"
+    assert payload["summary"]["tool_call_count"] == 1
+    assert payload["results"][0]["tool_calls"][0]["name"] == "search"

@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.4.0 - 2026-09-18
+
+### Added
+
+- Baseline regression comparison with CI thresholds for:
+  - previously passing cases that regress,
+  - pass-rate drop,
+  - average latency increase,
+  - average LLM-judge score drop.
+- `agent-eval compare` for comparing two existing JSON reports.
+- OpenAI-compatible tool definitions and `tool_choice` in YAML cases.
+- Normalized tool-call capture in evaluation reports.
+- Agent tool-call assertions:
+  - required and forbidden tools,
+  - ordered tool trajectories,
+  - maximum tool-call count,
+  - per-tool argument JSON Schema.
+- RAG citation-source validation, citation precision, and context-source coverage.
+- Custom evaluator registry with `@evaluator(...)`.
+- Plugin loading from importable modules or local Python files.
+- Report schema metadata and tool-call reporting.
+
+### Compatibility
+
+- v0.1 `expected_contains` / `expected_not_contains` suites remain supported.
+- v0.2 `expect:` suites remain supported.
+- Existing response-only evaluations do not need tool configuration.
+
 ## 0.2.0 - 2026-09-18
 
 - Added the `expect:` evaluation DSL while keeping v0.1 suites compatible.

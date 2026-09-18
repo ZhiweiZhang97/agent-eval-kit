@@ -4,26 +4,22 @@
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
-A lightweight, provider-agnostic regression evaluation toolkit for **LLM agents and RAG applications**.
+A lightweight, provider-agnostic regression evaluation toolkit for **LLM agents, tool calls, and RAG applications**.
 
-Agent Eval Kit turns important prompts and expected behaviors into version-controlled tests that run locally or in CI against any OpenAI-compatible `/chat/completions` endpoint.
+Agent Eval Kit turns prompts, tool contracts, retrieval evidence, and expected behaviors into version-controlled tests that can run locally or in CI against OpenAI-compatible endpoints.
 
-## Why this project?
+## What's new in v0.4
 
-LLM applications can regress even when application code barely changes. Prompts evolve, retrieval changes, providers update models, orchestration logic shifts, and structured output contracts break. Agent Eval Kit provides a small, inspectable baseline for catching those changes without requiring a hosted evaluation platform or a provider-specific SDK.
+v0.4 expands the project from response-only evaluation into a practical agent/RAG regression framework:
 
-## v0.2 highlights
+- **Baseline regression gates** for case regressions, pass-rate drops, latency growth, and judge-score drops.
+- **Agent tool-call evaluation** for required/forbidden tools, ordered trajectories, maximum calls, and argument JSON Schema.
+- **Tool definitions in YAML**, passed through to OpenAI-compatible APIs with optional `tool_choice`.
+- **Stronger RAG citation checks** for source validity, citation precision, and context-source coverage.
+- **Pluggable custom evaluators** loaded from Python modules or local `.py` files.
+- Versioned JSON reports that preserve normalized tool calls for CI and downstream analysis.
 
-- YAML evaluation suites with a readable `expect:` DSL
-- Backward compatibility with the v0.1 `expected_contains` format
-- Deterministic checks: contains, not-contains, regex, latency thresholds
-- JSON Schema validation for structured outputs
-- Basic RAG citation/evidence checks
-- Optional **LLM-as-a-Judge** scoring with a separate judge model
-- Concurrent execution with retry/backoff for transient API failures
-- JSON, Markdown, HTML, and JUnit reports
-- GitHub Actions examples for CI and regression evaluation
-- OpenAI-compatible APIs; no provider SDK lock-in
+The v0.2 capabilities remain available: contains/not-contains, regex, JSON Schema, latency thresholds, LLM-as-a-Judge, concurrency, retries, HTML/Markdown/JUnit reports, and the legacy YAML syntax.
 
 ## Install
 
@@ -64,114 +60,203 @@ report.html
 junit.xml
 ```
 
-A non-zero exit code is returned when any case fails, making the command suitable for CI gates.
+A non-zero exit code is returned when a case fails or when an enabled baseline gate detects a regression.
 
-## Evaluation suite format
+## Response evaluation
 
 ```yaml
 cases:
-  - id: grounded-answer
-    system: "Answer only from context and cite the source id."
-    context: |
-      [doc-1] RAG combines retrieval with generation.
-    prompt: "What is RAG?"
+  - id: structured-answer
+    system: "Return JSON only."
+    prompt: "Return status=ok and confidence=0.9."
     expect:
-      contains: ["retrieval", "generation"]
-      not_contains: ["I browsed the web"]
-      regex: ["(?i)rag|retrieval-augmented"]
-      citations:
-        required: ["[doc-1]"]
-        min_count: 1
-      max_latency_ms: 30000
+      json_schema:
+        type: object
+        required: [status, confidence]
+        properties:
+          status: {const: ok}
+          confidence: {type: number, minimum: 0, maximum: 1}
 ```
 
-### Structured-output validation
+Other deterministic response checks include `contains`, `not_contains`, `regex`, and `max_latency_ms`.
+
+## Agent tool-call evaluation
+
+A test can define tools exactly as an OpenAI-compatible API expects them:
+
+```yaml
+cases:
+  - id: weather-agent
+    prompt: "What is the weather in Hangzhou?"
+    tools:
+      - type: function
+        function:
+          name: get_weather
+          description: Get current weather for a city.
+          parameters:
+            type: object
+            required: [city]
+            properties:
+              city: {type: string}
+    tool_choice: auto
+    expect:
+      tool_calls:
+        required: [get_weather]
+        forbidden: [delete_user_data]
+        max_count: 2
+        args_schema:
+          get_weather:
+            type: object
+            required: [city]
+            properties:
+              city: {type: string}
+```
+
+For multi-step agents, require an ordered subsequence:
 
 ```yaml
 expect:
-  json_schema:
-    type: object
-    required: [status, confidence]
-    properties:
-      status: {const: ok}
-      confidence: {type: number, minimum: 0, maximum: 1}
+  tool_calls:
+    ordered: [search, summarize]
 ```
 
-Markdown fenced JSON is accepted as well as raw JSON.
+The order check allows unrelated calls between expected steps while preserving the required trajectory order.
 
-### LLM-as-a-Judge
+## RAG citation validation
 
-Use judge checks only when deterministic checks are insufficient:
+v0.4 can verify that generated citations actually refer to source identifiers present in the supplied context:
+
+```yaml
+cases:
+  - id: grounded-rag
+    context: |
+      [doc-1] RAG combines retrieval with generation.
+      [doc-2] Regression tests detect unwanted behavior changes.
+    prompt: "Explain both ideas."
+    expect:
+      citations:
+        min_count: 2
+        validate_sources: true
+        min_precision: 1.0
+        min_source_coverage: 1.0
+```
+
+- `validate_sources: true` defaults the required precision to 1.0.
+- `min_precision` is the fraction of cited identifiers that exist in context.
+- `min_source_coverage` is the fraction of context source identifiers cited in the answer.
+- `required` can still require specific citations explicitly.
+
+For semantic faithfulness, combine these deterministic checks with an LLM judge.
+
+## LLM-as-a-Judge
 
 ```yaml
 expect:
   judge:
-    criteria: "The answer should be concise, correct, and grounded in the supplied context."
+    criteria: "The answer must be correct, concise, and supported by the supplied context."
     min_score: 0.8
 ```
 
-Then configure a judge model:
+Configure a judge model:
 
 ```bash
 export AGENT_EVAL_JUDGE_MODEL=your-judge-model
-# Optional: use a different compatible endpoint for judging
 export AGENT_EVAL_JUDGE_BASE_URL=https://judge.example.com/v1
 export AGENT_EVAL_JUDGE_API_KEY=your-judge-key
-
-agent-eval run examples/basic.yaml
 ```
 
-The judge is prompted to return a score from `0` to `1` plus a short reason. Deterministic checks should still be preferred when possible.
+Deterministic checks should be preferred when a deterministic contract is possible.
+
+## Baseline regression gates
+
+Save a known-good `report.json`, then compare a later run against it:
+
+```bash
+agent-eval run examples/basic.yaml \
+  --baseline baselines/main.json \
+  --max-case-regressions 0 \
+  --max-pass-rate-drop 0 \
+  --max-latency-increase-pct 20 \
+  --max-judge-score-drop 0.05
+```
+
+Or compare two existing reports without making model calls:
+
+```bash
+agent-eval compare baselines/main.json agent-eval-results/report.json \
+  --max-case-regressions 0 \
+  --max-pass-rate-drop 0 \
+  --max-latency-increase-pct 20
+```
+
+The baseline gate detects:
+
+- cases that previously passed but now fail,
+- pass-rate drops in percentage points,
+- average latency increases,
+- average LLM-judge score drops.
+
+## Custom evaluator plugins
+
+Create a Python evaluator:
+
+```python
+from agent_eval_kit.models import CheckResult
+from agent_eval_kit.plugins import evaluator
+
+@evaluator("short-answer")
+def short_answer(case, response, tool_calls, config):
+    maximum = int(config.get("max_chars", 500))
+    return CheckResult(
+        len(response) <= maximum,
+        f"Response length is {len(response)}; maximum is {maximum}.",
+    )
+```
+
+Reference it in YAML:
+
+```yaml
+expect:
+  custom:
+    short-answer:
+      max_chars: 500
+```
+
+Load the plugin when running:
+
+```bash
+agent-eval run suite.yaml --plugin examples/custom_evaluator.py
+```
+
+Plugins execute local Python code. Only load plugins you trust.
 
 ## CI usage
 
-The repository includes two workflows:
+The repository includes:
 
-- `.github/workflows/ci.yml` — lint, tests, and package build on Python 3.10–3.12.
-- `.github/workflows/agent-eval-example.yml` — a manual regression workflow that reads endpoint/model settings from GitHub Actions secrets and uploads evaluation reports as an artifact.
+- `.github/workflows/ci.yml` — lint, tests, and package builds on Python 3.10–3.12.
+- `.github/workflows/agent-eval-example.yml` — a manual API-backed evaluation workflow that stores reports as artifacts.
 
-This keeps real API credentials out of the repository while providing a copyable starting point for PR or release gates.
-
-## CLI options
-
-```text
-agent-eval validate SUITE.yaml
-
-agent-eval run SUITE.yaml \
-  --base-url ... \
-  --model ... \
-  --workers 4 \
-  --retries 2 \
-  --timeout 60 \
-  --judge-model ... \
-  --out-dir agent-eval-results
-```
+For a production repository, keep a reviewed baseline JSON file on the default branch and compare pull-request results against it.
 
 ## Design principles
 
-1. **Version-control the contract.** Important prompts and expected behaviors should live beside application code.
-2. **Prefer deterministic checks.** Use schema, string, regex, citation, and latency checks before an LLM judge.
-3. **Provider agnostic by default.** The core depends on an OpenAI-compatible HTTP contract rather than vendor SDKs.
-4. **CI first.** Reports and exit codes are designed for automated regression gates.
-5. **Keep private data private.** Public examples must use synthetic or properly licensed data.
+1. **Version-control the contract.** Prompts, tools, and expected behavior should be reviewable diffs.
+2. **Evaluate the agent, not only the prose.** Tool choice, arguments, order, and final answers all matter.
+3. **Prefer deterministic checks.** Use schema, source, trajectory, and threshold checks before LLM judging.
+4. **Provider agnostic by default.** Core execution targets OpenAI-compatible HTTP APIs.
+5. **Make regressions actionable.** CI should show which behavior changed and why.
+6. **Keep private data private.** Public suites and bug reports should use synthetic or licensed data.
 
-## Roadmap
+## Project status
 
-Good contribution areas include:
+Agent Eval Kit is an early-stage open-source project. The public API is intentionally small, but minor versions may still refine configuration names and report fields before 1.0.
 
-- semantic similarity evaluators
-- richer RAG faithfulness and citation attribution checks
-- tool-call / agent-trajectory evaluation
-- dataset adapters
-- baseline comparison and regression thresholds
-- pluggable custom evaluators
-- richer HTML dashboards
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+See [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md).
 
 ## Security and privacy
 
-Do not commit API keys, private service URLs, customer prompts, confidential documents, or evaluation outputs containing sensitive data. Use GitHub Actions secrets and synthetic/public examples.
+Do not commit API keys, private endpoints, customer prompts, confidential documents, or evaluation reports containing sensitive information. Use environment variables and CI secret stores.
 
 ## License
 

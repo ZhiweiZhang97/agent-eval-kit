@@ -27,8 +27,16 @@ def run_cases(
                 prompt=case.prompt,
                 system=case.system,
                 context=case.context,
+                tools=case.tools,
+                tool_choice=case.tool_choice,
             )
-            return evaluate_case(case, chat.content, chat.latency_ms, judge_fn=judge_fn)
+            return evaluate_case(
+                case,
+                chat.content,
+                chat.latency_ms,
+                judge_fn=judge_fn,
+                tool_calls=chat.tool_calls,
+            )
         except Exception as exc:
             return EvalResult(
                 id=case.id,

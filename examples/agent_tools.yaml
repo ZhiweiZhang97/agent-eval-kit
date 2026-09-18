@@ -1,0 +1,46 @@
+cases:
+  - id: weather-tool
+    prompt: "What is the weather in Hangzhou?"
+    tools:
+      - type: function
+        function:
+          name: get_weather
+          description: Get current weather for a city.
+          parameters:
+            type: object
+            required: [city]
+            properties:
+              city:
+                type: string
+    tool_choice: auto
+    expect:
+      tool_calls:
+        required: [get_weather]
+        forbidden: [delete_user_data]
+        max_count: 2
+        args_schema:
+          get_weather:
+            type: object
+            required: [city]
+            properties:
+              city:
+                type: string
+
+  - id: grounded-rag
+    context: |
+      [doc-1] RAG combines retrieval with generation.
+      [doc-2] Regression tests detect unwanted behavior changes.
+    prompt: "Explain both statements and cite the sources."
+    expect:
+      citations:
+        min_count: 2
+        validate_sources: true
+        min_precision: 1.0
+        min_source_coverage: 1.0
+
+  - id: concise-output
+    prompt: "Explain an LLM regression test in one short paragraph."
+    expect:
+      custom:
+        short-answer:
+          max_chars: 500
