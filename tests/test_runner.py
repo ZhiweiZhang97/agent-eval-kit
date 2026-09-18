@@ -1,5 +1,6 @@
 from agent_eval_kit.client import ChatResponse
-from agent_eval_kit.models import Expectation, TestCase as EvalCase
+from agent_eval_kit.models import Expectation
+from agent_eval_kit.models import TestCase as EvalCase
 from agent_eval_kit.runner import run_cases
 
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 import json
 import re
-from typing import Callable
 
 from jsonschema import SchemaError, ValidationError, validate
 
@@ -33,7 +33,9 @@ def evaluate_case(
 
     for token in case.expect.not_contains:
         ok = token.lower() not in response.lower()
-        checks[f"not_contains:{token}"] = CheckResult(ok, f"Expected response not to contain {token!r}.")
+        checks[f"not_contains:{token}"] = CheckResult(
+            ok, f"Expected response not to contain {token!r}."
+        )
 
     for pattern in case.expect.regex:
         try:
@@ -56,7 +58,9 @@ def evaluate_case(
     if citations is not None:
         for required in citations.required:
             ok = required in response
-            checks[f"citation:{required}"] = CheckResult(ok, f"Required citation {required!r} was not found.")
+            checks[f"citation:{required}"] = CheckResult(
+                ok, f"Required citation {required!r} was not found."
+            )
         try:
             count = len(re.findall(citations.pattern, response))
             ok = count >= citations.min_count
@@ -76,7 +80,9 @@ def evaluate_case(
 
     if case.expect.judge is not None:
         if judge_fn is None:
-            checks["judge"] = CheckResult(False, "Judge is configured for the case but no judge model was provided.")
+            checks["judge"] = CheckResult(
+                False, "Judge is configured for the case but no judge model was provided."
+            )
         else:
             try:
                 score, detail = judge_fn(case, response)

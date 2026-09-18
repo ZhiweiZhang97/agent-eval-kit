@@ -1,5 +1,6 @@
 from agent_eval_kit.evaluator import evaluate_case
-from agent_eval_kit.models import CitationSpec, Expectation, JudgeSpec, TestCase as EvalCase
+from agent_eval_kit.models import CitationSpec, Expectation, JudgeSpec
+from agent_eval_kit.models import TestCase as EvalCase
 
 
 def test_contains_and_not_contains_pass():
@@ -17,7 +18,11 @@ def test_json_schema_and_citation_pass():
         id="json",
         prompt="q",
         expect=Expectation(
-            json_schema={"type": "object", "required": ["ok"], "properties": {"ok": {"type": "boolean"}}},
+            json_schema={
+                "type": "object",
+                "required": ["ok"],
+                "properties": {"ok": {"type": "boolean"}},
+            },
         ),
     )
     result = evaluate_case(case, '{"ok": true}', 3.0)

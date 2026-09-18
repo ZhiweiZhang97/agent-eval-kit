@@ -60,10 +60,13 @@ def run(
             )
             judge_fn = LLMJudge(judge_client, judge_model)
         else:
-            console.print("[yellow]Warning:[/yellow] judge checks exist but --judge-model was not set.")
+            console.print(
+                "[yellow]Warning:[/yellow] judge checks exist but --judge-model was not set."
+            )
 
     def progress(result: EvalResult) -> None:
-        console.print(f"{'[green]PASS[/green]' if result.passed else '[red]FAIL[/red]'} {result.id}")
+        status = "[green]PASS[/green]" if result.passed else "[red]FAIL[/red]"
+        console.print(f"{status} {result.id}")
 
     results = run_cases(
         cases=cases,

@@ -70,15 +70,11 @@ class OpenAICompatibleClient:
                 )
             except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
                 last_error = exc
-                retryable = not isinstance(exc, httpx.HTTPStatusError) or exc.response.status_code in {
-                    408,
-                    409,
-                    429,
-                    500,
-                    502,
-                    503,
-                    504,
-                }
+                retryable = (
+                    not isinstance(exc, httpx.HTTPStatusError)
+                    or exc.response.status_code
+                    in {408, 409, 429, 500, 502, 503, 504}
+                )
                 if attempt >= self.retries or not retryable:
                     break
                 time.sleep((0.5 * (2**attempt)) + random.uniform(0, 0.2))
