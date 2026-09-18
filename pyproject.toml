@@ -50,6 +50,7 @@ agent-eval = "agent_eval_kit.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/ZhiweiZhang97/agent-eval-kit"
+Repository = "https://github.com/ZhiweiZhang97/agent-eval-kit"
 Documentation = "https://github.com/ZhiweiZhang97/agent-eval-kit#readme"
 Issues = "https://github.com/ZhiweiZhang97/agent-eval-kit/issues"
 Changelog = "https://github.com/ZhiweiZhang97/agent-eval-kit/blob/main/CHANGELOG.md"

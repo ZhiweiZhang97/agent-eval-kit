@@ -255,7 +255,7 @@ The repository includes:
 6. **Stay provider-agnostic and locally inspectable.**
 7. **Keep private data private.**
 
-See [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and [docs/architecture.md](docs/architecture.md).
+See [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), [docs/architecture.md](docs/architecture.md), and [docs/publishing.md](docs/publishing.md).
 
 ## License
 
