@@ -1,0 +1,29 @@
+name: Agent Eval Example
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -e .
+      - name: Run regression evaluation
+        env:
+          OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          AGENT_EVAL_JUDGE_MODEL: ${{ secrets.AGENT_EVAL_JUDGE_MODEL }}
+        run: agent-eval run examples/basic.yaml --out-dir agent-eval-results
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-eval-results
+          path: agent-eval-results/

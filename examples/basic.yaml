@@ -1,0 +1,36 @@
+cases:
+  - id: grounded-answer
+    system: "Answer only from the supplied context. Cite the source identifier in square brackets."
+    context: |
+      [rag-guide] Retrieval-augmented generation combines retrieval with generation to ground model answers in external knowledge.
+    prompt: "What is retrieval-augmented generation?"
+    expect:
+      contains: ["retrieval", "generation"]
+      not_contains: ["I browsed the web"]
+      citations:
+        required: ["[rag-guide]"]
+        min_count: 1
+      max_latency_ms: 30000
+
+  - id: structured-output
+    system: "Return JSON only."
+    prompt: "Return a JSON object with status='ok' and confidence=0.9."
+    expect:
+      json_schema:
+        type: object
+        required: [status, confidence]
+        properties:
+          status:
+            const: ok
+          confidence:
+            type: number
+            minimum: 0
+            maximum: 1
+        additionalProperties: false
+
+  - id: semantic-quality
+    prompt: "Explain why regression tests are useful for LLM applications in two short sentences."
+    expect:
+      judge:
+        criteria: "The response should clearly explain that LLM behavior can change because prompts, retrieval, providers, or models change, and that regression tests catch undesirable behavior changes."
+        min_score: 0.75
