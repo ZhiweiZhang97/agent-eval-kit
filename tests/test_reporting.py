@@ -5,7 +5,7 @@ from agent_eval_kit.models import CheckResult, EvalResult, ToolCall
 from agent_eval_kit.reporting import write_html, write_json, write_junit, write_markdown
 
 
-def test_all_report_formats_include_tool_calls(tmp_path: Path):
+def test_all_report_formats_include_stability_and_tool_calls(tmp_path: Path):
     results = [
         EvalResult(
             id="a",
@@ -14,6 +14,9 @@ def test_all_report_formats_include_tool_calls(tmp_path: Path):
             latency_ms=10.0,
             checks={"contains:ok": CheckResult(True, "found")},
             tool_calls=[ToolCall("search", {"query": "x"})],
+            sample_count=3,
+            pass_count=3,
+            latency_stddev_ms=1.5,
         )
     ]
     paths = {
@@ -32,6 +35,9 @@ def test_all_report_formats_include_tool_calls(tmp_path: Path):
         assert path.stat().st_size > 0
 
     payload = json.loads(paths["json"].read_text(encoding="utf-8"))
-    assert payload["toolkit_version"] == "0.4.0"
+    assert payload["toolkit_version"] == "0.5.0"
+    assert payload["schema_version"] == "1.2"
     assert payload["summary"]["tool_call_count"] == 1
-    assert payload["results"][0]["tool_calls"][0]["name"] == "search"
+    assert payload["summary"]["sample_count"] == 3
+    assert payload["summary"]["sample_pass_rate"] == 100.0
+    assert payload["results"][0]["latency_stddev_ms"] == 1.5

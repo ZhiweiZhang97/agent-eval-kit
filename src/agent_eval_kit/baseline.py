@@ -17,6 +17,18 @@ class BaselineThresholds:
 
 
 @dataclass
+class CaseDiff:
+    id: str
+    before_passed: bool
+    after_passed: bool
+    latency_delta_ms: float
+    latency_delta_pct: float | None
+    judge_delta: float | None
+    before_tools: list[str] = field(default_factory=list)
+    after_tools: list[str] = field(default_factory=list)
+
+
+@dataclass
 class BaselineComparison:
     passed: bool
     case_regressions: list[str] = field(default_factory=list)
@@ -24,6 +36,7 @@ class BaselineComparison:
     latency_increase_pct: float = 0.0
     judge_score_drop: float = 0.0
     reasons: list[str] = field(default_factory=list)
+    case_diffs: list[CaseDiff] = field(default_factory=list)
 
 
 def load_report(path: str | Path) -> dict[str, Any]:
@@ -56,40 +69,84 @@ def report_results(report: dict[str, Any]) -> list[EvalResult]:
             )
             for call in item.get("tool_calls") or []
         ]
+        passed = bool(item.get("passed"))
         results.append(
             EvalResult(
                 id=str(item["id"]),
-                passed=bool(item.get("passed")),
+                passed=passed,
                 response=str(item.get("response", "")),
                 latency_ms=float(item.get("latency_ms", 0.0)),
                 checks=checks,
                 error=str(item["error"]) if item.get("error") is not None else None,
                 metadata=dict(item.get("metadata") or {}),
                 tool_calls=tool_calls,
+                sample_count=int(item.get("sample_count", 1)),
+                pass_count=int(item.get("pass_count", 1 if passed else 0)),
+                latency_stddev_ms=float(item.get("latency_stddev_ms", 0.0)),
+                judge_score_stddev=(
+                    float(item["judge_score_stddev"])
+                    if isinstance(item.get("judge_score_stddev"), int | float)
+                    else None
+                ),
             )
         )
     return results
 
 
+def _judge_score_from_payload(item: dict[str, Any]) -> float | None:
+    score = ((item.get("checks") or {}).get("judge") or {}).get("score")
+    return float(score) if isinstance(score, int | float) else None
+
+
+def _judge_score_from_result(item: EvalResult) -> float | None:
+    check = item.checks.get("judge")
+    return check.score if check is not None else None
+
+
 def _avg_judge_from_payload(results: list[dict[str, Any]]) -> float | None:
-    scores: list[float] = []
-    for result in results:
-        checks = result.get("checks") or {}
-        judge = checks.get("judge") or {}
-        score = judge.get("score")
-        if isinstance(score, int | float):
-            scores.append(float(score))
+    scores = [
+        score
+        for item in results
+        if (score := _judge_score_from_payload(item)) is not None
+    ]
     return sum(scores) / len(scores) if scores else None
 
 
 def _avg_judge_from_results(results: list[EvalResult]) -> float | None:
     scores = [
-        check.score
-        for result in results
-        for name, check in result.checks.items()
-        if name == "judge" and check.score is not None
+        score
+        for item in results
+        if (score := _judge_score_from_result(item)) is not None
     ]
     return sum(scores) / len(scores) if scores else None
+
+
+def _case_diff(previous: dict[str, Any], current: EvalResult) -> CaseDiff:
+    before_latency = float(previous.get("latency_ms", 0.0))
+    latency_delta = current.latency_ms - before_latency
+    latency_pct = None
+    if before_latency > 0:
+        latency_pct = latency_delta / before_latency * 100
+
+    before_judge = _judge_score_from_payload(previous)
+    after_judge = _judge_score_from_result(current)
+    judge_delta = None
+    if before_judge is not None and after_judge is not None:
+        judge_delta = after_judge - before_judge
+
+    return CaseDiff(
+        id=current.id,
+        before_passed=bool(previous.get("passed")),
+        after_passed=current.passed,
+        latency_delta_ms=latency_delta,
+        latency_delta_pct=latency_pct,
+        judge_delta=judge_delta,
+        before_tools=[
+            str(call.get("name", ""))
+            for call in previous.get("tool_calls") or []
+        ],
+        after_tools=[call.name for call in current.tool_calls],
+    )
 
 
 def compare_results(
@@ -160,6 +217,12 @@ def compare_results(
             f"limit {thresholds.max_judge_score_drop:.3f}."
         )
 
+    case_diffs = [
+        _case_diff(baseline_by_id[item.id], item)
+        for item in current
+        if item.id in baseline_by_id
+    ]
+
     return BaselineComparison(
         passed=not reasons,
         case_regressions=case_regressions,
@@ -167,4 +230,47 @@ def compare_results(
         latency_increase_pct=latency_increase_pct,
         judge_score_drop=judge_score_drop,
         reasons=reasons,
+        case_diffs=case_diffs,
     )
+
+
+def comparison_markdown(comparison: BaselineComparison) -> str:
+    status = "PASS" if comparison.passed else "FAIL"
+    lines = [
+        "# Agent Eval Baseline Comparison",
+        "",
+        f"**Gate: {status}**",
+        "",
+        f"- Case regressions: **{len(comparison.case_regressions)}**",
+        f"- Pass-rate drop: **{comparison.pass_rate_drop:.2f} pp**",
+        f"- Latency increase: **{comparison.latency_increase_pct:.2f}%**",
+        f"- Judge-score drop: **{comparison.judge_score_drop:.4f}**",
+        "",
+    ]
+    if comparison.reasons:
+        lines.extend(["## Gate failures", ""])
+        lines.extend(f"- {reason}" for reason in comparison.reasons)
+        lines.append("")
+
+    lines.extend(
+        [
+            "## Case diff",
+            "",
+            "| Case | Before | After | Latency Δ | Judge Δ | Tool sequence |",
+            "|---|---:|---:|---:|---:|---|",
+        ]
+    )
+    for diff in comparison.case_diffs:
+        latency = f"{diff.latency_delta_ms:+.1f} ms"
+        if diff.latency_delta_pct is not None:
+            latency += f" ({diff.latency_delta_pct:+.1f}%)"
+        judge = "-" if diff.judge_delta is None else f"{diff.judge_delta:+.3f}"
+        before_tools = " → ".join(diff.before_tools) or "-"
+        after_tools = " → ".join(diff.after_tools) or "-"
+        tool_change = before_tools if before_tools == after_tools else f"{before_tools} → {after_tools}"
+        lines.append(
+            f"| {diff.id} | {'PASS' if diff.before_passed else 'FAIL'} | "
+            f"{'PASS' if diff.after_passed else 'FAIL'} | {latency} | "
+            f"{judge} | {tool_change} |"
+        )
+    return "\n".join(lines) + "\n"

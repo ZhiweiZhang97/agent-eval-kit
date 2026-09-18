@@ -92,3 +92,17 @@ class EvalResult:
     error: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
     tool_calls: list[ToolCall] = field(default_factory=list)
+    sample_count: int = 1
+    pass_count: int | None = None
+    latency_stddev_ms: float = 0.0
+    judge_score_stddev: float | None = None
+
+    def __post_init__(self) -> None:
+        if self.pass_count is None:
+            self.pass_count = 1 if self.passed else 0
+
+    @property
+    def sample_pass_rate(self) -> float:
+        if self.sample_count <= 0:
+            return 0.0
+        return (self.pass_count or 0) / self.sample_count

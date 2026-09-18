@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import json
 import random
+import threading
 import time
 from dataclasses import dataclass
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 import httpx
@@ -51,6 +53,21 @@ def normalize_tool_calls(message: dict[str, Any]) -> list[ToolCall]:
     return calls
 
 
+def _retry_after_seconds(response: httpx.Response) -> float | None:
+    value = response.headers.get("Retry-After")
+    if not value:
+        return None
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        try:
+            target = parsedate_to_datetime(value)
+            now = parsedate_to_datetime(response.headers.get("Date", ""))
+            return max(0.0, (target - now).total_seconds())
+        except (TypeError, ValueError):
+            return None
+
+
 class OpenAICompatibleClient:
     def __init__(
         self,
@@ -58,11 +75,26 @@ class OpenAICompatibleClient:
         api_key: str | None = None,
         timeout: float = 60.0,
         retries: int = 2,
+        min_interval_ms: float = 0.0,
     ):
         self.base_url = base_url.rstrip("/")
         self.api_key = api_key
         self.timeout = timeout
         self.retries = max(0, retries)
+        self.min_interval_ms = max(0.0, min_interval_ms)
+        self._pace_lock = threading.Lock()
+        self._last_request_started = 0.0
+
+    def _pace(self) -> None:
+        if self.min_interval_ms <= 0:
+            return
+        with self._pace_lock:
+            now = time.monotonic()
+            minimum = self.min_interval_ms / 1000
+            remaining = minimum - (now - self._last_request_started)
+            if remaining > 0:
+                time.sleep(remaining)
+            self._last_request_started = time.monotonic()
 
     def chat(
         self,
@@ -101,6 +133,7 @@ class OpenAICompatibleClient:
 
         for attempt in range(self.retries + 1):
             try:
+                self._pace()
                 with httpx.Client(timeout=self.timeout) as client:
                     response = client.post(
                         f"{self.base_url}/chat/completions",
@@ -119,14 +152,24 @@ class OpenAICompatibleClient:
                 )
             except (httpx.TimeoutException, httpx.NetworkError, httpx.HTTPStatusError) as exc:
                 last_error = exc
-                retryable = (
-                    not isinstance(exc, httpx.HTTPStatusError)
-                    or exc.response.status_code
-                    in {408, 409, 429, 500, 502, 503, 504}
-                )
+                retry_after = None
+                retryable = True
+                if isinstance(exc, httpx.HTTPStatusError):
+                    retryable = exc.response.status_code in {
+                        408,
+                        409,
+                        429,
+                        500,
+                        502,
+                        503,
+                        504,
+                    }
+                    retry_after = _retry_after_seconds(exc.response)
                 if attempt >= self.retries or not retryable:
                     break
-                time.sleep((0.5 * (2**attempt)) + random.uniform(0, 0.2))
+
+                fallback = (0.5 * (2**attempt)) + random.uniform(0, 0.2)
+                time.sleep(retry_after if retry_after is not None else fallback)
 
         assert last_error is not None
         raise last_error

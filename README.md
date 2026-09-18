@@ -1,25 +1,27 @@
 # Agent Eval Kit
 
 [![CI](https://github.com/ZhiweiZhang97/agent-eval-kit/actions/workflows/ci.yml/badge.svg)](https://github.com/ZhiweiZhang97/agent-eval-kit/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10--3.13-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](LICENSE)
 
 A lightweight, provider-agnostic regression evaluation toolkit for **LLM agents, tool calls, and RAG applications**.
 
-Agent Eval Kit turns prompts, tool contracts, retrieval evidence, and expected behaviors into version-controlled tests that can run locally or in CI against OpenAI-compatible endpoints.
+Agent Eval Kit turns prompts, tool contracts, retrieval evidence, and expected behaviors into version-controlled tests that run locally or in CI against OpenAI-compatible endpoints.
 
-## What's new in v0.4
+## What's new in v0.5
 
-v0.4 expands the project from response-only evaluation into a practical agent/RAG regression framework:
+v0.5 focuses on reliability, comparison, and maintainability:
 
-- **Baseline regression gates** for case regressions, pass-rate drops, latency growth, and judge-score drops.
-- **Agent tool-call evaluation** for required/forbidden tools, ordered trajectories, maximum calls, and argument JSON Schema.
-- **Tool definitions in YAML**, passed through to OpenAI-compatible APIs with optional `tool_choice`.
-- **Stronger RAG citation checks** for source validity, citation precision, and context-source coverage.
-- **Pluggable custom evaluators** loaded from Python modules or local `.py` files.
-- Versioned JSON reports that preserve normalized tool calls for CI and downstream analysis.
+- **Repeated evaluation** with per-case sample pass rate, average latency, latency standard deviation, and judge-score variance.
+- **Stability gates** with `--repeats` and `--min-repeat-pass-rate`.
+- **Model / endpoint matrix** runs from a simple targets YAML file.
+- **PR-friendly baseline diffs** showing pass/fail changes, per-case latency deltas, judge-score deltas, and tool-sequence changes.
+- **Rate-limit-aware retries** that respect `Retry-After` and optional request pacing.
+- **Default report redaction** for common credential and token shapes.
+- CI now covers Python 3.10–3.13.
+- Dependabot configuration and a tag-triggered GitHub Release workflow.
 
-The v0.2 capabilities remain available: contains/not-contains, regex, JSON Schema, latency thresholds, LLM-as-a-Judge, concurrency, retries, HTML/Markdown/JUnit reports, and the legacy YAML syntax.
+v0.4 capabilities remain: tool-call evaluation, RAG citation validation, baseline gates, custom evaluators, JSON Schema, LLM-as-a-Judge, concurrent execution, and JSON/Markdown/HTML/JUnit reports.
 
 ## Install
 
@@ -35,15 +37,9 @@ pip install -e ".[dev]"
 
 ## Quick start
 
-Validate a suite without making model calls:
-
 ```bash
 agent-eval validate examples/basic.yaml
-```
 
-Run against any OpenAI-compatible endpoint:
-
-```bash
 export OPENAI_BASE_URL=https://api.example.com/v1
 export OPENAI_MODEL=your-model
 export OPENAI_API_KEY=your-key
@@ -58,9 +54,52 @@ report.json
 report.md
 report.html
 junit.xml
+baseline-comparison.md   # when --baseline is used
 ```
 
-A non-zero exit code is returned when a case fails or when an enabled baseline gate detects a regression.
+## Repeated runs and stability
+
+Single-shot evaluation can hide stochastic regressions. Run each case multiple times:
+
+```bash
+agent-eval run examples/basic.yaml \
+  --repeats 5 \
+  --min-repeat-pass-rate 0.8
+```
+
+A case passes the repeat gate only when its sample pass rate reaches the configured threshold. Reports include sample count, pass count, sample pass rate, mean latency, latency standard deviation, and judge-score standard deviation when a judge is used.
+
+This keeps one stable case identity for Baseline comparison instead of generating synthetic case IDs for each sample.
+
+## Model / endpoint matrix
+
+Create a target file:
+
+```yaml
+targets:
+  - name: primary
+    base_url: https://api.example.com/v1
+    model: model-a
+    api_key_env: PRIMARY_API_KEY
+
+  - name: candidate
+    base_url: https://candidate.example.com/v1
+    model: model-b
+    api_key_env: CANDIDATE_API_KEY
+    min_interval_ms: 250
+```
+
+Then run the same deterministic suite against every target:
+
+```bash
+agent-eval matrix examples/basic.yaml examples/matrix.yaml \
+  --repeats 3 \
+  --out-dir agent-eval-matrix
+```
+
+The matrix writes `matrix.json` and `matrix.md` with case pass rate, sample pass rate, and average latency for each target.
+
+Matrix mode currently requires deterministic checks. Suites using LLM-as-a-Judge should use `agent-eval run`, where judge endpoint/model settings are explicit.
 
 ## Response evaluation
 
@@ -81,8 +120,6 @@ cases:
 Other deterministic response checks include `contains`, `not_contains`, `regex`, and `max_latency_ms`.
 
 ## Agent tool-call evaluation
-
-A test can define tools exactly as an OpenAI-compatible API expects them:
 
 ```yaml
 cases:
@@ -112,7 +149,7 @@ cases:
               city: {type: string}
 ```
 
-For multi-step agents, require an ordered subsequence:
+For multi-step agents:
 
 ```yaml
 expect:
@@ -120,11 +157,7 @@ expect:
     ordered: [search, summarize]
 ```
 
-The order check allows unrelated calls between expected steps while preserving the required trajectory order.
-
 ## RAG citation validation
-
-v0.4 can verify that generated citations actually refer to source identifiers present in the supplied context:
 
 ```yaml
 cases:
@@ -141,35 +174,9 @@ cases:
         min_source_coverage: 1.0
 ```
 
-- `validate_sources: true` defaults the required precision to 1.0.
-- `min_precision` is the fraction of cited identifiers that exist in context.
-- `min_source_coverage` is the fraction of context source identifiers cited in the answer.
-- `required` can still require specific citations explicitly.
+For semantic faithfulness, combine deterministic citation checks with an LLM judge.
 
-For semantic faithfulness, combine these deterministic checks with an LLM judge.
-
-## LLM-as-a-Judge
-
-```yaml
-expect:
-  judge:
-    criteria: "The answer must be correct, concise, and supported by the supplied context."
-    min_score: 0.8
-```
-
-Configure a judge model:
-
-```bash
-export AGENT_EVAL_JUDGE_MODEL=your-judge-model
-export AGENT_EVAL_JUDGE_BASE_URL=https://judge.example.com/v1
-export AGENT_EVAL_JUDGE_API_KEY=your-judge-key
-```
-
-Deterministic checks should be preferred when a deterministic contract is possible.
-
-## Baseline regression gates
-
-Save a known-good `report.json`, then compare a later run against it:
+## Baseline regression gates and diffs
 
 ```bash
 agent-eval run examples/basic.yaml \
@@ -180,25 +187,29 @@ agent-eval run examples/basic.yaml \
   --max-judge-score-drop 0.05
 ```
 
-Or compare two existing reports without making model calls:
+Or compare reports without model calls:
 
 ```bash
 agent-eval compare baselines/main.json agent-eval-results/report.json \
   --max-case-regressions 0 \
-  --max-pass-rate-drop 0 \
-  --max-latency-increase-pct 20
+  --markdown-out agent-eval-results/pr-diff.md
 ```
 
-The baseline gate detects:
+The Markdown diff includes per-case status changes, latency deltas, judge deltas, and tool-sequence changes, so it can be posted directly into a pull request.
 
-- cases that previously passed but now fail,
-- pass-rate drops in percentage points,
-- average latency increases,
-- average LLM-judge score drops.
+## Rate-limit-aware execution
+
+Transient retryable failures use retry/backoff. When a server returns `Retry-After`, Agent Eval Kit respects it.
+
+For providers with a known request-rate limit, pace starts explicitly:
+
+```bash
+agent-eval run suite.yaml --workers 8 --min-request-interval-ms 250
+```
+
+This pacing is shared across worker threads for one client.
 
 ## Custom evaluator plugins
-
-Create a Python evaluator:
 
 ```python
 from agent_eval_kit.models import CheckResult
@@ -213,50 +224,38 @@ def short_answer(case, response, tool_calls, config):
     )
 ```
 
-Reference it in YAML:
-
-```yaml
-expect:
-  custom:
-    short-answer:
-      max_chars: 500
-```
-
-Load the plugin when running:
-
 ```bash
 agent-eval run suite.yaml --plugin examples/custom_evaluator.py
 ```
 
 Plugins execute local Python code. Only load plugins you trust.
 
-## CI usage
+## Report safety
+
+Generated JSON, Markdown, HTML, and JUnit reports redact common credential-like strings by default, including provider-prefixed tokens, Bearer-style tokens, and common key/token assignment forms.
+
+Redaction is defense-in-depth, not a substitute for keeping private prompts and production secrets out of public evaluation suites.
+
+## CI and releases
 
 The repository includes:
 
-- `.github/workflows/ci.yml` — lint, tests, and package builds on Python 3.10–3.12.
-- `.github/workflows/agent-eval-example.yml` — a manual API-backed evaluation workflow that stores reports as artifacts.
-
-For a production repository, keep a reviewed baseline JSON file on the default branch and compare pull-request results against it.
+- `.github/workflows/ci.yml` — lint, tests, and package builds on Python 3.10–3.13.
+- `.github/workflows/agent-eval-example.yml` — manual secret-backed evaluation.
+- `.github/workflows/release.yml` — builds and publishes GitHub Release assets for `v*` tags.
+- `.github/dependabot.yml` — monthly Python and GitHub Actions dependency updates.
 
 ## Design principles
 
-1. **Version-control the contract.** Prompts, tools, and expected behavior should be reviewable diffs.
-2. **Evaluate the agent, not only the prose.** Tool choice, arguments, order, and final answers all matter.
-3. **Prefer deterministic checks.** Use schema, source, trajectory, and threshold checks before LLM judging.
-4. **Provider agnostic by default.** Core execution targets OpenAI-compatible HTTP APIs.
-5. **Make regressions actionable.** CI should show which behavior changed and why.
-6. **Keep private data private.** Public suites and bug reports should use synthetic or licensed data.
+1. **Version-control the contract.**
+2. **Evaluate agent behavior, not only prose.**
+3. **Measure stability, not only one lucky sample.**
+4. **Prefer deterministic checks before model judges.**
+5. **Make regressions reviewable in CI.**
+6. **Stay provider-agnostic and locally inspectable.**
+7. **Keep private data private.**
 
-## Project status
-
-Agent Eval Kit is an early-stage open-source project. The public API is intentionally small, but minor versions may still refine configuration names and report fields before 1.0.
-
-See [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), and [AGENTS.md](AGENTS.md).
-
-## Security and privacy
-
-Do not commit API keys, private endpoints, customer prompts, confidential documents, or evaluation reports containing sensitive information. Use environment variables and CI secret stores.
+See [ROADMAP.md](ROADMAP.md), [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md), and [docs/architecture.md](docs/architecture.md).
 
 ## License
 

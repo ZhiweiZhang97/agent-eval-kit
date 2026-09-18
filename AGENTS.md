@@ -2,7 +2,7 @@
 
 ## Project goal
 
-Keep Agent Eval Kit small, dependable, provider-agnostic, and useful for response, RAG, and tool-calling regression tests.
+Keep Agent Eval Kit small, dependable, provider-agnostic, and useful for response, RAG, tool-calling, and model-regression tests.
 
 ## Development rules
 
@@ -11,23 +11,25 @@ Keep Agent Eval Kit small, dependable, provider-agnostic, and useful for respons
 - Avoid provider-specific SDKs in core code; prefer OpenAI-compatible HTTP interfaces.
 - Prefer deterministic evaluators over LLM judges when a deterministic contract is possible.
 - Preserve documented YAML compatibility unless a major version explicitly changes it.
-- Treat JSON report fields as an emerging public interface; version schema changes.
-- Keep configuration explicit and public examples runnable with synthetic data.
-- Do not commit API keys, private endpoints, customer data, or sensitive reports.
+- Treat JSON report fields as a public interface and version schema changes.
+- Keep examples synthetic and safe to publish.
+- Never commit credentials, private endpoints, customer data, or sensitive reports.
 - Run `ruff check .`, `pytest -q`, and `python -m build` before submitting changes.
 
 ## Architecture
 
 - `loaders.py`: YAML parsing and backwards compatibility.
-- `models.py`: public evaluation and tool-call data structures.
-- `client.py`: OpenAI-compatible HTTP client, tools, retry logic, tool normalization.
+- `models.py`: public evaluation, tool-call, and stability data structures.
+- `client.py`: OpenAI-compatible HTTP client, pacing, retries, and tool normalization.
 - `evaluator.py`: deterministic response, RAG, and tool-call assertions.
 - `plugins.py`: custom evaluator registry and explicit plugin loading.
 - `judge.py`: optional LLM-as-a-Judge implementation.
-- `runner.py`: concurrent, continue-on-error orchestration.
-- `baseline.py`: report loading and regression thresholds.
+- `runner.py`: concurrent execution plus repeated-run aggregation.
+- `baseline.py`: Baseline thresholds and per-case diffs.
+- `matrix.py`: multi-model / multi-endpoint comparison configuration and reports.
+- `redaction.py`: defense-in-depth report secret redaction.
 - `reporting.py`: versioned JSON plus Markdown, HTML, and JUnit outputs.
-- `cli.py`: validation, execution, plugin loading, and baseline comparison.
+- `cli.py`: validation, execution, compare, matrix, plugins, and Baseline gates.
 
 ## Good contribution areas
 
@@ -35,5 +37,5 @@ Keep Agent Eval Kit small, dependable, provider-agnostic, and useful for respons
 - Multi-turn agent trajectory imports.
 - Semantic similarity evaluators with optional dependencies.
 - Baseline and PR diff presentation.
-- Rate-limit aware scheduling.
 - Dataset adapters.
+- Usage/cost accounting.

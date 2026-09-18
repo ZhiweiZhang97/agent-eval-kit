@@ -2,21 +2,21 @@
 
 Agent Eval Kit aims to remain a small, inspectable regression framework rather than a hosted evaluation platform.
 
-## v0.5 — Reproducibility and comparison
+## v0.6 — Rich agent traces and RAG faithfulness
 
-- Repeated runs and variance summaries for stochastic models.
-- Model/provider comparison matrices.
-- Per-case latency and judge-score regression diffs.
-- Better PR-friendly Markdown summaries.
-- Rate-limit aware scheduling.
-
-## v0.6 — RAG and agent depth
-
+- Multi-turn trajectory objects rather than only single-response tool calls.
+- Trace import adapters for common agent frameworks.
 - Claim-level citation attribution.
 - Optional semantic similarity evaluators.
-- Richer agent trajectory objects for multi-turn tool execution.
-- Dataset adapters for JSONL and CSV.
-- Optional trace import from common agent frameworks.
+- JSONL and CSV dataset adapters.
+
+## v0.7 — CI and experiment ergonomics
+
+- GitHub PR comment integration.
+- Versioned baseline management helpers.
+- Richer matrix diffs between candidate models.
+- Historical trend aggregation from report files.
+- Cost/token accounting when providers expose usage metadata.
 
 ## Toward 1.0
 
@@ -24,7 +24,7 @@ Agent Eval Kit aims to remain a small, inspectable regression framework rather t
 - Stabilize the JSON report schema.
 - Define plugin API compatibility guarantees.
 - Publish migration guides for breaking changes.
-- Add a documented security and privacy threat model.
+- Expand the documented security and privacy threat model.
 
 ## Non-goals
 

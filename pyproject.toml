@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "agent-eval-kit"
-version = "0.4.0"
+version = "0.5.0"
 description = "Regression evaluation toolkit for LLM agents, tool calls, and RAG applications."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -25,6 +25,7 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
   "License :: OSI Approved :: Apache Software License",
   "Operating System :: OS Independent",
 ]
@@ -49,7 +50,9 @@ agent-eval = "agent_eval_kit.cli:app"
 
 [project.urls]
 Homepage = "https://github.com/ZhiweiZhang97/agent-eval-kit"
+Documentation = "https://github.com/ZhiweiZhang97/agent-eval-kit#readme"
 Issues = "https://github.com/ZhiweiZhang97/agent-eval-kit/issues"
+Changelog = "https://github.com/ZhiweiZhang97/agent-eval-kit/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agent_eval_kit"]

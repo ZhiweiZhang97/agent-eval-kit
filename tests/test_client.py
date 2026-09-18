@@ -1,4 +1,6 @@
-from agent_eval_kit.client import normalize_tool_calls
+import httpx
+
+from agent_eval_kit.client import _retry_after_seconds, normalize_tool_calls
 
 
 def test_normalize_modern_tool_calls():
@@ -32,3 +34,12 @@ def test_normalize_legacy_function_call():
     )
     assert calls[0].name == "lookup"
     assert calls[0].arguments == {"id": 3}
+
+
+def test_retry_after_seconds_header():
+    response = httpx.Response(
+        429,
+        headers={"Retry-After": "2.5"},
+        request=httpx.Request("POST", "https://example.com"),
+    )
+    assert _retry_after_seconds(response) == 2.5

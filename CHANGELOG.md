@@ -1,52 +1,46 @@
 # Changelog
 
-## 0.4.0 - 2026-09-18
+## 0.5.0 - 2026-09-18
 
 ### Added
 
-- Baseline regression comparison with CI thresholds for:
-  - previously passing cases that regress,
-  - pass-rate drop,
-  - average latency increase,
-  - average LLM-judge score drop.
-- `agent-eval compare` for comparing two existing JSON reports.
-- OpenAI-compatible tool definitions and `tool_choice` in YAML cases.
-- Normalized tool-call capture in evaluation reports.
-- Agent tool-call assertions:
-  - required and forbidden tools,
-  - ordered tool trajectories,
-  - maximum tool-call count,
-  - per-tool argument JSON Schema.
-- RAG citation-source validation, citation precision, and context-source coverage.
-- Custom evaluator registry with `@evaluator(...)`.
-- Plugin loading from importable modules or local Python files.
-- Report schema metadata and tool-call reporting.
+- Repeated per-case evaluation with configurable repeat count and minimum sample pass-rate gates.
+- Latency standard deviation and judge-score standard deviation for repeated runs.
+- Model / endpoint matrix command driven by YAML targets.
+- PR-friendly Baseline Markdown diff with per-case status, latency, judge, and tool-sequence changes.
+- Rate-limit-aware retry handling that honors `Retry-After`.
+- Cross-thread minimum request interval for provider pacing.
+- Automatic report redaction for common credential-like strings.
+- Python 3.13 CI coverage.
+- Dependabot configuration.
+- Tag-triggered GitHub Release packaging workflow.
+
+### Changed
+
+- JSON report schema version is now `1.2`.
+- Reports expose sample count, sample pass rate, and latency variability.
+- The CLI table shows repeated-run stability when repeats are enabled.
 
 ### Compatibility
 
-- v0.1 `expected_contains` / `expected_not_contains` suites remain supported.
-- v0.2 `expect:` suites remain supported.
-- Existing response-only evaluations do not need tool configuration.
+- Existing suites still default to one sample per case.
+- v0.1 and v0.2 YAML compatibility remains.
+- v0.4 tool-call, RAG, Baseline, and plugin syntax remains supported.
+
+## 0.4.0 - 2026-09-18
+
+- Added Baseline regression gates.
+- Added agent tool definitions and tool-call assertions.
+- Added RAG citation-source validation and source coverage.
+- Added custom evaluator plugins.
+- Added normalized tool calls to versioned reports.
 
 ## 0.2.0 - 2026-09-18
 
 - Added the `expect:` evaluation DSL while keeping v0.1 suites compatible.
-- Added regex and latency checks.
-- Added JSON Schema validation for structured model output.
-- Added RAG citation/evidence checks.
-- Added optional LLM-as-a-Judge scoring.
-- Added concurrent execution and retry/backoff for transient API errors.
-- Added HTML and JUnit reports alongside JSON and Markdown.
-- Expanded CI to Python 3.10–3.12 and package-build validation.
-- Added a GitHub Actions example for secret-backed regression evaluation.
-- Expanded examples and automated tests.
+- Added regex, latency, JSON Schema, RAG citations, LLM-as-a-Judge, concurrency,
+  retries, and HTML/JUnit reporting.
 
 ## 0.1.0 - 2026-09-18
 
-Initial public-ready release:
-
-- YAML evaluation cases
-- OpenAI-compatible chat client
-- deterministic contains / not-contains checks
-- JSON and Markdown reports
-- CI workflow and tests
+Initial public-ready release.

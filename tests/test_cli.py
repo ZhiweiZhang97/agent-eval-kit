@@ -14,10 +14,10 @@ def test_validate_command(tmp_path: Path):
     assert "1 cases loaded" in result.stdout
 
 
-def test_compare_command_passes_for_equal_reports(tmp_path: Path):
+def test_compare_command_writes_markdown(tmp_path: Path):
     report = {
-        "schema_version": "1.1",
-        "toolkit_version": "0.4.0",
+        "schema_version": "1.2",
+        "toolkit_version": "0.5.0",
         "summary": {"pass_rate": 100.0, "avg_latency_ms": 10.0},
         "results": [
             {
@@ -27,15 +27,29 @@ def test_compare_command_passes_for_equal_reports(tmp_path: Path):
                 "latency_ms": 10.0,
                 "checks": {},
                 "tool_calls": [],
+                "sample_count": 1,
+                "pass_count": 1,
             }
         ],
     }
     baseline = tmp_path / "baseline.json"
     current = tmp_path / "current.json"
+    markdown = tmp_path / "comparison.md"
     payload = json.dumps(report)
     baseline.write_text(payload, encoding="utf-8")
     current.write_text(payload, encoding="utf-8")
 
-    result = CliRunner().invoke(app, ["compare", str(baseline), str(current)])
+    result = CliRunner().invoke(
+        app,
+        [
+            "compare",
+            str(baseline),
+            str(current),
+            "--markdown-out",
+            str(markdown),
+        ],
+    )
     assert result.exit_code == 0
     assert "Baseline regression gate" in result.stdout
+    assert markdown.exists()
+    assert "Case diff" in markdown.read_text(encoding="utf-8")

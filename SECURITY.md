@@ -2,10 +2,21 @@
 
 ## Reporting a vulnerability
 
-Please do not disclose security vulnerabilities in a public issue. Use GitHub's private vulnerability reporting feature when available for this repository.
+Please do not disclose security vulnerabilities in a public issue. Use GitHub private vulnerability reporting when available.
 
-Include a concise description, affected version, reproduction steps, and potential impact. Please avoid including real API keys, private prompts, customer data, or confidential endpoint URLs in any report.
+Include a concise description, affected version, reproduction steps, and potential impact. Do not include real credentials, private prompts, customer data, or confidential service URLs.
 
-## Secrets and evaluation data
+## Threat model notes
 
-Agent Eval Kit is designed to run against model endpoints and may process sensitive prompts. Keep credentials in environment variables or CI secret stores. Public examples and bug reports should use synthetic or properly licensed data only.
+Agent Eval Kit processes model prompts, outputs, tool arguments, and evaluation metadata. These may contain confidential information.
+
+- Store provider credentials in environment variables or CI secret stores.
+- Treat generated reports and CI artifacts as potentially sensitive.
+- v0.5 applies defense-in-depth redaction for common credential-like strings, but redaction is not guaranteed to recognize every secret format.
+- Custom evaluator plugins execute arbitrary Python code. Load only trusted plugins.
+- Matrix configuration should name credential environment variables rather than embedding credential values.
+- Public examples and bug reports should use synthetic or properly licensed data.
+
+## Dependency and CI hygiene
+
+The repository uses automated dependency update proposals and CI across supported Python versions. Review dependency changes before merging them.

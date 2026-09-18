@@ -1,0 +1,12 @@
+targets:
+  - name: primary
+    base_url: https://api.example.com/v1
+    model: model-a
+    api_key_env: PRIMARY_API_KEY
+    min_interval_ms: 0
+
+  - name: candidate
+    base_url: https://candidate.example.com/v1
+    model: model-b
+    api_key_env: CANDIDATE_API_KEY
+    min_interval_ms: 250
