@@ -53,7 +53,10 @@ def write_html(path: str | Path, results: list[EvalResult]) -> None:
     rows: list[str] = []
     for r in results:
         checks = "<br>".join(
-            f"{'✅' if c.passed else '❌'} <code>{html.escape(name)}</code> — {html.escape(c.detail)}"
+            (
+                f"{'✅' if c.passed else '❌'} <code>{html.escape(name)}</code> — "
+                f"{html.escape(c.detail)}"
+            )
             for name, c in r.checks.items()
         ) or "No checks"
         rows.append(
