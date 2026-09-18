@@ -1,9 +1,6 @@
-from agent_eval_kit.models import CheckResult, TestCase as EvalCase
-from agent_eval_kit.plugins import (
-    clear_evaluators,
-    evaluator,
-    run_custom_evaluator,
-)
+from agent_eval_kit.models import CheckResult
+from agent_eval_kit.models import TestCase as EvalCase
+from agent_eval_kit.plugins import clear_evaluators, evaluator, run_custom_evaluator
 
 
 def test_custom_evaluator_registry():
