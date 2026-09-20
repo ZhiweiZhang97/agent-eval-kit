@@ -25,13 +25,17 @@ v0.4 capabilities remain: tool-call evaluation, RAG citation validation, baselin
 
 ## Install
 
+From a GitHub Release tag:
+
 ```bash
-pip install -e .
+pip install "git+https://github.com/ZhiweiZhang97/agent-eval-kit.git@v0.5.0"
 ```
 
-For development:
+For local development:
 
 ```bash
+git clone https://github.com/ZhiweiZhang97/agent-eval-kit.git
+cd agent-eval-kit
 pip install -e ".[dev]"
 ```
 
