@@ -8,32 +8,33 @@ Agent Eval Kit publishes versioned builds through GitHub Releases only. The proj
 - GitHub repository: `agent-eval-kit`
 - Release workflow: `.github/workflows/release.yml`
 
-The package version in `pyproject.toml` must exactly match the release tag with a leading `v`. For example, package version `0.5.0` must be released with tag `v0.5.0`.
+The package version in `pyproject.toml` must exactly match the release version.
 
-## Release procedure
+## Recommended: release from GitHub Actions
 
 1. Confirm the default-branch CI is green.
-2. Update the package version, changelog, citation metadata, and documentation.
-3. Create and push the matching version tag:
+2. Open **Actions → Release → Run workflow**.
+3. Enter the version without a leading `v`, for example `0.5.0`.
+4. Run the workflow.
 
-   ```bash
-   git checkout main
-   git pull --ff-only
-   git tag -a v0.5.0 -m "Agent Eval Kit v0.5.0"
-   git push origin v0.5.0
-   ```
+The workflow verifies that the requested version matches `pyproject.toml`, confirms the release commit is on `main`, creates the corresponding annotated Git tag, builds the source distribution and wheel, runs Twine metadata checks, creates the GitHub Release, and attaches both artifacts.
 
-4. The `Release` workflow will:
-   - confirm the tagged commit is reachable from `main`,
-   - verify the tag matches `pyproject.toml`,
-   - build the source distribution and wheel,
-   - run Twine metadata checks,
-   - create a GitHub Release,
-   - attach both build artifacts to the Release.
+## Alternative: release by pushing a tag
+
+You can also create the version tag locally:
+
+```bash
+git checkout main
+git pull --ff-only
+git tag -a v0.5.0 -m "Agent Eval Kit v0.5.0"
+git push origin v0.5.0
+```
+
+A pushed `v*` tag triggers the same build and GitHub Release pipeline.
 
 ## Installation
 
-Users can install directly from GitHub:
+Users can install directly from a release tag:
 
 ```bash
 pip install "git+https://github.com/ZhiweiZhang97/agent-eval-kit.git@v0.5.0"
@@ -45,8 +46,13 @@ Or download the wheel from the GitHub Release and install it locally:
 pip install agent_eval_kit-0.5.0-py3-none-any.whl
 ```
 
-## Failure behavior
+## Safety checks
 
-If the tag does not match the package version, or the tag points to a commit that is not reachable from `main`, the workflow stops before creating a Release.
+The workflow refuses a release when:
 
-Changes to `.github/workflows/release.yml` should be reviewed as release-sensitive changes because the workflow has permission to create GitHub Releases.
+- the requested/tagged version does not match `pyproject.toml`,
+- the release commit is not reachable from `main`,
+- a manual release tries to create a tag that already exists,
+- package build or Twine metadata validation fails.
+
+Changes to `.github/workflows/release.yml` should be reviewed as release-sensitive because the workflow can create tags and GitHub Releases.

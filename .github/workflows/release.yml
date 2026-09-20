@@ -4,53 +4,104 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version without the leading v (for example: 0.5.0)"
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build distributions
+  prepare:
+    name: Prepare release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
 
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-
-      - name: Verify tag commit is on main
+      - name: Resolve and verify release tag
+        id: release
         shell: bash
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
         run: |
-          git fetch origin main
-          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
-            echo "Release tag must point to a commit reachable from main."
-            exit 1
-          }
-
-      - name: Verify tag matches package version
-        shell: bash
-        run: |
-          python - <<'PY'
+          python - <<'PY' >> "$GITHUB_OUTPUT"
           import os
           import tomllib
           from pathlib import Path
 
-          tag = os.environ["GITHUB_REF_NAME"]
-          version = tomllib.loads(
+          package_version = tomllib.loads(
               Path("pyproject.toml").read_text(encoding="utf-8")
           )["project"]["version"]
-          expected = f"v{version}"
-          if tag != expected:
-              raise SystemExit(
-                  f"Release tag {tag!r} does not match package version {expected!r}."
-              )
-          print(f"Verified release {tag}")
+
+          if os.environ["GITHUB_EVENT_NAME"] == "workflow_dispatch":
+              requested = os.environ.get("REQUESTED_VERSION", "").strip()
+              if requested.startswith("v"):
+                  requested = requested[1:]
+              if requested != package_version:
+                  raise SystemExit(
+                      f"Requested version {requested!r} does not match "
+                      f"package version {package_version!r}."
+                  )
+              tag = f"v{requested}"
+          else:
+              tag = os.environ["GITHUB_REF_NAME"]
+              expected = f"v{package_version}"
+              if tag != expected:
+                  raise SystemExit(
+                      f"Release tag {tag!r} does not match package "
+                      f"version {expected!r}."
+                  )
+
+          print(f"tag={tag}")
           PY
+
+      - name: Verify release commit is on main
+        shell: bash
+        run: |
+          git fetch origin main
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "Release commit must be reachable from main."
+            exit 1
+          }
+
+      - name: Create tag for manual release
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Tag $RELEASE_TAG already exists."
+            exit 1
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$RELEASE_TAG" "$GITHUB_SHA" -m "Agent Eval Kit $RELEASE_TAG"
+          git push origin "$RELEASE_TAG"
+
+  build:
+    name: Build distributions
+    needs: prepare
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
 
       - name: Build and verify release distributions
         run: |
@@ -68,7 +119,7 @@ jobs:
 
   github-release:
     name: Create GitHub Release
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -83,8 +134,9 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.tag }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/* \
+          gh release create "$RELEASE_TAG" dist/* \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Agent Eval Kit $GITHUB_REF_NAME" \
+            --title "Agent Eval Kit $RELEASE_TAG" \
             --generate-notes
